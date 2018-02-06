@@ -28,7 +28,5 @@ Daí, basta executar:
 sh run.sh
 ```
 
-> Nota: caso você esteja no Windows, utilize o seguinte comando:
-> `scrapy runspider cursos_prouni.py -o cursos-prouni.csv`.
-
-O arquivo `cursos-prouni.csv` será criado. Divirta-se! :)
+Os arquivos `cursos-prouni.csv` e `enderecos-campi.csv` serão criados (além de
+versões deles em `xls` e `sqlite`). Divirta-se! :)

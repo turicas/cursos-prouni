@@ -94,7 +94,7 @@ class ProuniSpider(Spider):
             campi = universidade.xpath('./table[@class="tabela_bordas campus"]')
             for campus in campi:
                 campus_nome = ' '.join(campus.xpath('./thead/tr/th/text()').extract()).strip()
-                campus_endereco_id = int(campus.xpath('./thead/tr/th/a/@onclick').extract()[0].replace("visualizarEndereco('", '').replace("')", ''))
+                campus_id = int(campus.xpath('./thead/tr/th/a/@onclick').extract()[0].replace("visualizarEndereco('", '').replace("')", ''))
                 cursos = campus.xpath('./tbody/tr[not(contains(@class, "hide"))]')[2:]
                 table_html = header + '\n'.join([curso.extract() for curso in cursos]) + footer
                 table_cursos = rows.import_from_html(
@@ -102,7 +102,6 @@ class ProuniSpider(Spider):
                     encoding='utf8'
                 )
                 regexp_curso = re.compile(r'(.*) \(([0-9]+)\)')
-                cursos_extraidos = []
                 for curso in table_cursos:
                     curso = dict(curso._asdict())
                     curso['curso_busca'] = curso_busca
@@ -112,7 +111,7 @@ class ProuniSpider(Spider):
 
                     curso['universidade_nome'] = nome_universidade
                     curso['campus_nome'] = campus_nome
-                    curso['campus_endereco_id'] = campus_endereco_id
+                    curso['campus_id'] = campus_id
 
                     curso['nome'], curso['id_curso'] = \
                             regexp_curso.findall(curso['curso'])[0]
@@ -126,23 +125,4 @@ class ProuniSpider(Spider):
                         if curso[campo] == '---':
                             curso[campo] = None
 
-                    cursos_extraidos.append(curso)
-                yield FormRequest(
-                    callback=self.parse_campus_endereco,
-                    meta={'cursos_extraidos': cursos_extraidos},
-                    method='POST',
-                    url=f'http://prounialuno.mec.gov.br/consulta/mostrar-endereco/id/{campus_endereco_id}',
-                )
-
-    def parse_campus_endereco(self, response):
-        'Pega detalhes do endereço do campus e devolve os cursos disponíveis'
-
-        campos = ('campus_uf campus_municipio campus_logradouro '
-                  'campus_complemento campus_bairro campus_telefone').split()
-        valores = response.xpath('//span[@class="txt_form"]/text()').extract()
-        dados_campus = dict(zip(campos, [valor.strip() for valor in valores]))
-
-        cursos_extraidos = response.request.meta['cursos_extraidos']
-        for curso in cursos_extraidos:
-            curso.update(dados_campus)
-            yield curso
+                    yield curso
