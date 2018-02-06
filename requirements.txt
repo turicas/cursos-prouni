@@ -1,0 +1,8 @@
+click
+lxml
+requests
+requests-cache
+rows
+scrapy
+xlrd
+xlwt
