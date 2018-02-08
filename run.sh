@@ -22,9 +22,11 @@ QUERY_TESTE="SELECT
 rm -rf $OUTPUT1_CSV $OUTPUT2_CSV $OUTPUT1_XLS $OUTPUT2_XLS $OUTPUT_SQLITE
 scrapy runspider cursos_prouni.py \
 	-s HTTPCACHE_ENABLED=False \
+	--loglevel=INFO \
 	-o $OUTPUT1_CSV
 scrapy runspider enderecos_campi.py \
 	-s HTTPCACHE_ENABLED=False \
+	--loglevel=INFO \
 	-o $OUTPUT2_CSV
 
 echo "Extração ok. Convertendo arquivos..."
