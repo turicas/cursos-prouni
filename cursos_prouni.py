@@ -82,6 +82,8 @@ class ProuniSpider(Spider):
         footer = '''
             </table>
         '''
+        regexp_curso = re.compile(r'(.*) \(([0-9]+)\)')
+        regexp_notas = re.compile('bolsa\(s\) ([^ ]+) para (.+?) Nota de corte: ([0-9,]+)')
         meta = response.request.meta
         curso_busca = meta['curso_busca']
         cidade_busca = meta['cidade_busca']
@@ -96,33 +98,48 @@ class ProuniSpider(Spider):
                 campus_nome = ' '.join(campus.xpath('./thead/tr/th/text()').extract()).strip()
                 campus_id = int(campus.xpath('./thead/tr/th/a/@onclick').extract()[0].replace("visualizarEndereco('", '').replace("')", ''))
                 cursos = campus.xpath('./tbody/tr[not(contains(@class, "hide"))]')[2:]
-                table_html = header + '\n'.join([curso.extract() for curso in cursos]) + footer
-                table_cursos = rows.import_from_html(
-                    io.BytesIO(table_html.encode('utf8')),
-                    encoding='utf8'
-                )
-                regexp_curso = re.compile(r'(.*) \(([0-9]+)\)')
-                for curso in table_cursos:
-                    curso = dict(curso._asdict())
-                    curso['curso_busca'] = curso_busca
-                    curso['cidade_busca'] = cidade_busca
-                    curso['uf_busca'] = uf_busca
-                    curso['cidade_filtro'] = cidade_filtro
+                for curso in cursos:
+                    html = header + curso.extract() + footer
+                    table = rows.import_from_html(
+                        io.BytesIO(html.encode('utf8')),
+                        encoding='utf8'
+                    )
+                    data = dict(table[0]._asdict())
+                    data['curso_id'] = curso.xpath('@onclick').extract()[0]\
+                        .replace("visualizarEscolhaCurso('", '')\
+                        .replace("')", '')
+                    data['curso_busca'] = curso_busca
+                    data['cidade_busca'] = cidade_busca
+                    data['uf_busca'] = uf_busca
+                    data['cidade_filtro'] = cidade_filtro
 
-                    curso['universidade_nome'] = nome_universidade
-                    curso['campus_nome'] = campus_nome
-                    curso['campus_id'] = campus_id
+                    data['universidade_nome'] = nome_universidade
+                    data['campus_nome'] = campus_nome
+                    data['campus_id'] = campus_id
 
-                    curso['nome'], curso['id_curso'] = \
-                            regexp_curso.findall(curso['curso'])[0]
-                    del curso['curso']
-                    curso['mensalidade'] = decimal.Decimal(curso['mensalidade'].replace('R$', '').replace('.', '').replace(',', '.').strip())
+                    data['nome'], _ = regexp_curso.findall(data['curso'])[0]
+                    del data['curso']
+                    data['mensalidade'] = decimal.Decimal(
+                        data['mensalidade'].replace('R$', '')
+                                           .replace('.', '')
+                                           .replace(',', '.').strip()
+                    )
 
                     for campo in ('bolsa_integral_cotas',
                                   'bolsa_integral_ampla',
                                   'bolsa_parcial_cotas',
                                   'bolsa_parcial_ampla'):
-                        if curso[campo] == '---':
-                            curso[campo] = None
+                        if data[campo] == '---':
+                            data[campo] = None
 
-                    yield curso
+                    busca_notas = response.xpath(f'//div[contains(@id, "_{data["curso_id"]}")]/descendant::*/text()')
+                    notas_texto = ' '.join([texto.strip()
+                                            for texto in busca_notas.extract()
+                                            if texto.strip()])
+                    notas = set(regexp_notas.findall(notas_texto))
+                    notas = {f'nota_{nota[0].replace("is", "l")}_{nota[1].split()[0]}': nota[2].replace(',', '.')
+                             for nota in notas}
+                    for key in ('nota_integral_ampla', 'nota_integral_cotas',
+                                'nota_parcial_ampla', 'nota_parcial_cotas'):
+                        data[key] = notas.get(key, None)
+                    yield data
